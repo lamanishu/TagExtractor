@@ -1,131 +1,153 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 import java.io.*;
 import java.util.*;
 
 public class TagExtractorGUI extends JFrame {
-    private JButton selectTextButton, selectStopButton, extractButton, saveButton;
+
+    private JButton selectTextBtn, selectStopBtn, extractBtn, saveBtn;
     private JTextArea textArea;
+
     private File textFile;
     private File stopFile;
-    private Map<String, Integer> tagMap;
+
+    private Map<String, Integer> tagMap = new TreeMap<>();
 
     public TagExtractorGUI() {
+
         super("Tag/Keyword Extractor");
+
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(600, 500);
+        setSize(600, 450);
         setLayout(new BorderLayout());
 
-        JPanel topPanel = new JPanel();
-        selectTextButton = new JButton("Select Text File");
-        selectStopButton = new JButton("Select Stop Words File");
-        extractButton = new JButton("Extract Tags");
-        saveButton = new JButton("Save Tags");
+        JPanel panel = new JPanel();
 
-        topPanel.add(selectTextButton);
-        topPanel.add(selectStopButton);
-        topPanel.add(extractButton);
-        topPanel.add(saveButton);
-        add(topPanel, BorderLayout.NORTH);
+        selectTextBtn = new JButton("Select Text File");
+        selectStopBtn = new JButton("Select Stop Words File");
+        extractBtn = new JButton("Extract Tags");
+        saveBtn = new JButton("Save Tags");
+
+        panel.add(selectTextBtn);
+        panel.add(selectStopBtn);
+        panel.add(extractBtn);
+        panel.add(saveBtn);
+
+        add(panel, BorderLayout.NORTH);
 
         textArea = new JTextArea();
         textArea.setEditable(false);
         add(new JScrollPane(textArea), BorderLayout.CENTER);
 
-        selectTextButton.addActionListener(e -> chooseTextFile());
-        selectStopButton.addActionListener(e -> chooseStopFile());
-        extractButton.addActionListener(e -> runExtraction());
-        saveButton.addActionListener(e -> saveTags());
+        selectTextBtn.addActionListener(e -> chooseTextFile());
+        selectStopBtn.addActionListener(e -> chooseStopFile());
+        extractBtn.addActionListener(e -> extractTags());
+        saveBtn.addActionListener(e -> saveTags());
 
         setVisible(true);
     }
 
     private void chooseTextFile() {
         JFileChooser chooser = new JFileChooser();
-        int result = chooser.showOpenDialog(this);
-        if (result == JFileChooser.APPROVE_OPTION) {
+
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             textFile = chooser.getSelectedFile();
-            JOptionPane.showMessageDialog(this, "Selected text file: " + textFile.getName());
+
+            JOptionPane.showMessageDialog(this,
+                    "Selected Text File: " + textFile.getName());
+
+            setTitle("Tag Extractor - " + textFile.getName());
         }
     }
 
     private void chooseStopFile() {
         JFileChooser chooser = new JFileChooser();
-        int result = chooser.showOpenDialog(this);
-        if (result == JFileChooser.APPROVE_OPTION) {
+
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             stopFile = chooser.getSelectedFile();
-            JOptionPane.showMessageDialog(this, "Selected stop words file: " + stopFile.getName());
+
+            JOptionPane.showMessageDialog(this,
+                    "Selected Stop Words File: " + stopFile.getName());
         }
     }
 
-    private void runExtraction() {
+    private void extractTags() {
+
         if (textFile == null || stopFile == null) {
-            JOptionPane.showMessageDialog(this, "Please select both text and stop word files.");
+            JOptionPane.showMessageDialog(this,
+                    "Please select both files first!");
             return;
         }
+
+        tagMap.clear();
+
         try {
-            Set<String> stopWords = loadStopWords(stopFile);
-            tagMap = extractTags(textFile, stopWords);
-            displayTags(tagMap);
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error reading files.");
-        }
-    }
+            Set<String> stopWords = new HashSet<>();
 
-    private Set<String> loadStopWords(File file) throws IOException {
-        Set<String> stopWords = new TreeSet<>();
-        BufferedReader br = new BufferedReader(new FileReader(file));
-        String line;
-        while ((line = br.readLine()) != null) {
-            stopWords.add(line.trim().toLowerCase());
-        }
-        br.close();
-        return stopWords;
-    }
+            BufferedReader brStop = new BufferedReader(new FileReader(stopFile));
+            String line;
 
-    private Map<String, Integer> extractTags(File file, Set<String> stopWords) throws IOException {
-        Map<String, Integer> map = new TreeMap<>();
-        BufferedReader br = new BufferedReader(new FileReader(file));
-        String line;
-        while ((line = br.readLine()) != null) {
-            line = line.replaceAll("[^a-zA-Z ]", " ").toLowerCase();
-            String[] words = line.split("\\s+");
-            for (String word : words) {
-                if (word.isEmpty() || stopWords.contains(word)) continue;
-                map.put(word, map.getOrDefault(word, 0) + 1);
+            while ((line = brStop.readLine()) != null) {
+                stopWords.add(line.trim().toLowerCase());
             }
+            brStop.close();
+
+            BufferedReader brText = new BufferedReader(new FileReader(textFile));
+
+            while ((line = brText.readLine()) != null) {
+
+                line = line.replaceAll("[^a-zA-Z ]", " ").toLowerCase();
+                String[] words = line.split("\\s+");
+
+                for (String word : words) {
+
+                    if (!word.isEmpty() && !stopWords.contains(word)) {
+                        tagMap.put(word, tagMap.getOrDefault(word, 0) + 1);
+                    }
+                }
+            }
+
+            brText.close();
+
+            displayTags();
+
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Error reading files.");
         }
-        br.close();
-        return map;
     }
 
-    private void displayTags(Map<String, Integer> map) {
+    private void displayTags() {
+
         textArea.setText("");
-        for (Map.Entry<String, Integer> entry : map.entrySet()) {
+
+        for (Map.Entry<String, Integer> entry : tagMap.entrySet()) {
             textArea.append(entry.getKey() + ": " + entry.getValue() + "\n");
         }
     }
 
     private void saveTags() {
-        if (tagMap == null || tagMap.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No tags to save.");
+
+        if (tagMap.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "No tags to save!");
             return;
         }
-        JFileChooser chooser = new JFileChooser();
-        int result = chooser.showSaveDialog(this);
-        if (result == JFileChooser.APPROVE_OPTION) {
-            File outFile = chooser.getSelectedFile();
-            try (PrintWriter pw = new PrintWriter(outFile)) {
-                for (Map.Entry<String, Integer> entry : tagMap.entrySet()) {
-                    pw.println(entry.getKey() + ": " + entry.getValue());
-                }
-                JOptionPane.showMessageDialog(this, "Tags saved to " + outFile.getName());
-            } catch (IOException e) {
-                e.printStackTrace();
-                JOptionPane.showMessageDialog(this, "Error saving file.");
+
+        File outFile = new File("traveling_tags.txt");
+
+        try (PrintWriter pw = new PrintWriter(outFile)) {
+
+            for (Map.Entry<String, Integer> entry : tagMap.entrySet()) {
+                pw.println(entry.getKey() + ": " + entry.getValue());
             }
+
+            JOptionPane.showMessageDialog(this,
+                    "Saved successfully to:\n" + outFile.getAbsolutePath());
+
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Error saving file.");
         }
     }
 
